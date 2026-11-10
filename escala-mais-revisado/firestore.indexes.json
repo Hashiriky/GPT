@@ -1,0 +1,1 @@
+{"indexes":[{"collectionGroup":"igs","queryScope":"COLLECTION","fields":[{"fieldPath":"ids","arrayConfig":"CONTAINS"},{"fieldPath":"schema","order":"ASCENDING"}]}],"fieldOverrides":[]}

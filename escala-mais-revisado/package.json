@@ -1,0 +1,24 @@
+{
+  "name": "escala-mais-revisao",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test:privacy": "firebase emulators:exec --project demo-escala --only firestore \"node privacy.test.cjs && node migration.test.cjs\"",
+    "test:ui": "node browser-ui.test.cjs",
+    "test:integration": "firebase emulators:exec --project demo-escala --only auth,firestore \"node integration.test.cjs\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "esbuild": "0.28.2",
+    "firebase": "13.2.0",
+    "firebase-admin": "14.5.0",
+    "firebase-tools": "15.35.0",
+    "firebase10": "npm:firebase@^10.14.1",
+    "playwright": "1.65.0"
+  },
+  "private": true
+}

@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{db}/documents {
+  function signed(){return request.auth != null;}
+  function self(u){return signed() && request.auth.uid == u;}
+  function church(g){return get(/databases/$(db)/documents/igs/$(g)).data;}
+  function admin(g){return signed() && church(g).adm == request.auth.uid;}
+  function member(g){return signed() && request.auth.uid in church(g).ids;}
+  function publicProfile(u){return request.resource.data.keys().hasOnly(['u','n','foto','nasc'])
+   && request.resource.data.keys().hasAll(['u','n']) && request.resource.data.u == u
+   && request.resource.data.n is string && request.resource.data.n.size() <= 120
+   && request.resource.data.get('foto','') is string && request.resource.data.get('foto','').size() <= 40000
+   && request.resource.data.get('nasc','') is string;}
+  match /users/{u} {
+   allow read, delete: if self(u);
+   allow create, update: if self(u) && request.resource.data.keys().hasOnly(['n','tel','foto','nasc','pend'])
+    && request.resource.data.n is string && request.resource.data.tel is string
+    && request.resource.data.tel.size() <= 32;
+  }
+  match /codigos/{c} {
+   allow get: if signed();
+   allow create: if signed() && request.resource.data.keys().hasOnly(['g'])
+    && getAfter(/databases/$(db)/documents/igs/$(request.resource.data.g)).data.adm == request.auth.uid;
+  }
+  match /igs/{g} {
+   function valid(){return request.resource.data.schema == 2
+    && request.resource.data.keys().hasOnly(['schema','n','code','adm','ids','mins','cfg','ind','indr','nt','av','po']);}
+   allow create: if signed() && valid() && request.resource.data.adm == request.auth.uid
+    && request.resource.data.ids == [request.auth.uid];
+   allow read: if signed() && request.auth.uid in resource.data.ids && resource.data.schema == 2;
+   allow update: if member(g) && valid() && request.resource.data.adm == resource.data.adm
+    && request.resource.data.schema == resource.data.schema
+    && (admin(g) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mins','ind','indr','nt','av','po']));
+   // Legacy arrays still permit broad edits within these fields. See TRANSICAO.md.
+   // They never grant contact access: authorization uses the immutable adm field.
+   match /membros/{u} {
+    allow read: if member(g);
+    allow create: if publicProfile(u) &&
+     (getAfter(/databases/$(db)/documents/igs/$(g)).data.adm == request.auth.uid
+       && u in getAfter(/databases/$(db)/documents/igs/$(g)).data.ids);
+    allow update: if publicProfile(u) && (admin(g) || (self(u) && member(g)));
+    allow delete: if admin(g) && u != church(g).adm;
+   }
+   match /pedidos/{u} {
+    allow create: if self(u) && publicProfile(u) && !(u in church(g).ids);
+    allow read, delete: if self(u) || admin(g);
+   }
+   match /contatos/{u} {
+    function associated(){return u in getAfter(/databases/$(db)/documents/igs/$(g)).data.ids
+      || existsAfter(/databases/$(db)/documents/igs/$(g)/pedidos/$(u));}
+    function validPhone(){return request.resource.data.keys().hasOnly(['tel'])
+      && request.resource.data.tel is string && request.resource.data.tel.size() <= 32;}
+    allow read: if self(u) || admin(g);
+    allow create: if signed() && associated() && validPhone() && (admin(g)
+      || (self(u) && (!(u in getAfter(/databases/$(db)/documents/igs/$(g)).data.ids) || getAfter(/databases/$(db)/documents/igs/$(g)).data.get('cfg',{}).get('ph',true) != false) && request.resource.data.tel == getAfter(/databases/$(db)/documents/users/$(u)).data.tel));
+    allow update: if signed() && associated() && validPhone() && (admin(g)
+      || (self(u) && church(g).get('cfg',{}).get('ph',true) != false
+        && request.resource.data.tel == getAfter(/databases/$(db)/documents/users/$(u)).data.tel));
+    allow delete: if admin(g) || (self(u) && !(u in church(g).ids));
+   }
+  }
+ }
+}
